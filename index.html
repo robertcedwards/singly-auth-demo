@@ -1,0 +1,83 @@
+<html>
+<head>
+  <title>Singly + Firebase Example</title>
+  <script type="text/javascript" src="//cdn.firebase.com/v0/firebase.js"></script>
+  <script type='text/javascript' src='//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js'></script>
+  <link rel="stylesheet" type="text/css" href="//www.firebase.com/css/example.css">
+</head>
+<body>
+<a id="loginLink">Login</a>
+<br /><br />
+<div id='messagesDiv'></div>
+<input type='text' id='messageInput' placeholder='Message...'>
+<script type='text/javascript'>
+
+
+  var singlyAuthURL = "https://api.singly.com/oauth/authorize";
+  var clientID = "c188b06d77cf8cbb237717e4d024dd34";
+
+  //Note that the redirect URI must be set in singly's backend.
+  var redirectURI = location.href.replace(location.hash,"");
+  var loginLink = singlyAuthURL + "?client_id=" + clientID + "&redirect_uri=" + redirectURI + "&service=facebook&response_type=token";
+  
+  $("#loginLink").attr("href",  loginLink);
+
+  var firebaseToken = null;
+  var userData = null;
+  if(location.hash.length > 0 && location.hash.indexOf("#firebase") >= 0) {
+    var h = location.hash.substring(1);
+    firebaseToken = getQueryVariable("firebase", h);
+    var accessToken = getQueryVariable("access_token", h);
+      //Now go get the user's name and picture
+    $.ajax({
+      url: "https://api.singly.com/profile" + "?access_token=" + accessToken,
+      success: function(d) {
+        userData = d;
+      }
+    });
+  }
+
+  // Get a reference to the root of the chat data.
+  var messagesRef = new Firebase('https://singly-firebase-demo.firebaseio.com/');
+  if(firebaseToken != null) {
+    messagesRef.auth(firebaseToken, function(err, authData) {
+      if(!err) {
+        alert("Firebase auth successful!");
+	console.log(authData);
+      } else {
+        alert("Firebase auth failure: " + err.message);
+      }
+    });
+  }
+
+  // When the user presses enter on the message input, write the message to firebase.
+  $('#messageInput').keypress(function (e) {
+    if (e.keyCode == 13 && userData != null) {
+      var name = $('#nameInput').val();
+      var text = $('#messageInput').val();
+      messagesRef.push({name:userData.name, text:text, pic:userData.thumbnail_url});
+      $('#messageInput').val('');
+    }
+  });
+
+  // Add a callback that is triggered for each chat message.
+  messagesRef.on('child_added', function (snapshot) {
+    var message = snapshot.val();
+    $('<div/>').text(message.text).prepend($('<em/>').text(message.name+': ')).prepend($('<img style="width:45px; height:45px;" src="' + message.pic + '">')).appendTo($('#messagesDiv'));
+    $('#messagesDiv')[0].scrollTop = $('#messagesDiv')[0].scrollHeight;
+  });
+
+  function getQueryVariable(variable, hash) {
+    var query = hash;
+    var vars = query.split('&');
+    for (var i = 0; i < vars.length; i++) {
+      var pair = vars[i].split('=');
+      if (decodeURIComponent(pair[0]) == variable) {
+        return decodeURIComponent(pair[1]);
+      }
+    }
+  }
+</script>
+</body>
+
+</html>
